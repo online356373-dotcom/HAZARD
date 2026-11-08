@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Виртуальный пульт СГУ</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+            text-align: center;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .tab-btn {
+            background: #222;
+            color: #aaa;
+            border: 2px solid #333;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #ff3333;
+            color: #fff;
+            border-color: #ff6666;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.4);
+        }
+
+        .remote-control {
+            background: radial-gradient(145deg, #2a2a2a, #1a1a1a);
+            border: 4px solid #3a3a3a;
+            border-radius: 25px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.1);
+            max-width: 350px;
+            width: 100%;
+            display: none;
+            box-sizing: border-box;
+        }
+
+        .remote-control.active {
+            display: block;
+        }
+
+        .remote-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            color: #ffcc00;
+            text-shadow: 0 0 5px rgba(255, 204, 0, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3a3a3a, #2b2b2b);
+            border: 1px solid #555;
+            border-bottom: 4px solid #1a1a1a;
+            color: #fff;
+            padding: 22px 10px;
+            font-weight: bold;
+            font-size: 13px;
+            border-radius: 12px;
+            cursor: pointer;
+            user-select: none;
+            text-align: center;
+            box-shadow: 0 4px 5px rgba(0,0,0,0.3);
+            transition: all 0.05s ease;
+        }
+
+        .btn:active {
+            border-bottom: 1px solid #1a1a1a;
+            transform: translateY(3px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            background: #ff4444;
+            color: #fff;
+        }
+
+        .btn.horn {
+            background: linear-gradient(135deg, #ffcc00, #cc9900);
+            color: #000;
+            border-color: #ffee66;
+            border-bottom: 4px solid #886600;
+        }
+        .btn.horn:active {
+            background: #ffee00;
+            border-bottom: 1px solid #886600;
+            color: #000;
+        }
+
+        .btn.stop {
+            background: linear-gradient(135deg, #d32f2f, #9a0007);
+            color: #fff;
+            border-color: #ff6659;
+            border-bottom: 4px solid #5f0000;
+        }
+        .btn.stop:active {
+            background: #ff1744;
+            border-bottom: 1px solid #5f0000;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Пульт Управления СГУ</h1>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchRemote('hazard')">HAZARD 7007</button>
+        <button class="tab-btn" onclick="switchRemote('y13')">YARCHE Y13</button>
+    </div>
+
+    <!-- ИНТЕРФЕЙС ПУЛЬТА HAZARD 7007 -->
+    <div id="hazard" class="remote-control active">
+        <div class="remote-title">HAZARD 7007</div>
+        <div class="grid">
+            <button class="btn horn" onclick="playEmbedded('horn')">HORN</button>
+            <button class="btn" onclick="playEmbedded('wail')">WAIL</button>
+            <button class="btn" onclick="playEmbedded('yelp')">YELP</button>
+            <button class="btn" onclick="playEmbedded('hilo')">HI-LO</button>
+            <button class="btn" onclick="playEmbedded('hyper')">HYPER</button>
+            <button class="btn stop" onclick="stopSound()">STOP ✕</button>
+        </div>
+    </div>
+
+    <!-- ИНТЕРФЕЙС ПУЛЬТА YARCHE Y13 -->
+    <div id="y13" class="remote-control">
+        <div class="remote-title">YARCHE Y13</div>
+        <div class="grid">
+            <button class="btn horn" onclick="playEmbedded('y13horn')">HORN</button>
+            <button class="btn" onclick="playEmbedded('y13wail')">WAIL</button>
+            <button class="btn" onclick="playEmbedded('y13yelp')">YELP</button>
+            <button class="btn" onclick="playEmbedded('y13pier')">PIER</button>
+            <button class="btn" onclick="playEmbedded('y13man')">MANAL</button>
+            <button class="btn stop" onclick="stopSound()">STOP ✕</button>
+        </div>
+    </div>
+
+    <script>
+        // База данных звуков СГУ (синтезированные стабильные частоты без внешних аудио-файлов)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let activeOscillators = [];
+        let sirenInterval = null;
+
+        function stopSound() {
+            if (sirenInterval) clearInterval(sirenInterval);
+            activeOscillators.forEach(osc => { try { osc.stop(); } catch(e){} });
+            activeOscillators = [];
+        }
+
+        function playEmbedded(type) {
+            stopSound();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            activeOscillators.push(osc);
+
+            if (type === 'horn' || type === 'y13horn') {
+                // Мощный хриплый гудок крякалки (генерация пилы + меандра)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+                
+                const osc2 = audioCtx.createOscillator();
+                const gainNode2 = audioCtx.createGain();
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(280, audioCtx.currentTime);
+                osc2.connect(gainNode2);
+                gainNode2.connect(audioCtx.destination);
+                gainNode2.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                activeOscillators.push(osc2);
+                
+                gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                osc.start();
+                osc2.start();
+            } 
+            else if (type === 'wail' || type === 'y13wail') {
+                // Плавная сирена-вой
+                osc.type = 'sine';
+                osc.start();
+                let direction = 1;
+                let freq = 500;
+                sirenInterval = setInterval(() => {
+                    freq += direction * (type === 'wail' ? 4 : 6);
+                    if (freq > 1100) direction = -1;
+                    if (freq < 450) direction = 1;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                }, 10);
+            } 
+            else if (type === 'yelp' || type === 'y13yelp') {
+                // Быстрый визг СГУ
+                osc.type = 'sawtooth';
+                osc.start();
+                let freq = 600;
+                sirenInterval = setInterval(() => {
+                    freq += 35;
+                    if (freq > 1300) freq = 550;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                }, 10);
+            }
+            else if (type === 'hilo') {
+                // Двухтональная европейская сирена
+                osc.type = 'square';
+                osc.start();
+                let toggle = true;
+                osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+                sirenInterval = setInterval(() => {
+                    osc.frequency.setValueAtTime(toggle ? 650 : 450, audioCtx.currentTime);
+                    toggle = !toggle;
+                }, 500);
+            }
+            else if (type === 'hyper') {
+                // Ультра-быстрый Hyper-Yelp
+                osc.type = 'sawtooth';
+                osc.start();
+                let freq = 600;
+                sirenInterval = setInterval(() => {
+                    freq += 80;
+                    if (freq > 1400) freq = 600;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                }, 8);
+            }
+            else if (type === 'y13pier') {
+                // Резкое "сверление" Piercer
+                osc.type = 'triangle';
+                osc.start();
+                let freq = 800;
+                sirenInterval = setInterval(() => {
+                    freq += 120;
+                    if (freq > 1600) freq = 700;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                }, 5);
+            }
+            else if (type === 'y13man') {
+                // Ручная сирена (быстрый подъем частоты)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 1.5);
+                osc.start();
+            }
+        }
+
+        function switchRemote(remoteId) {
+            stopSound();
+            document.querySelectorAll('.remote-control').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
